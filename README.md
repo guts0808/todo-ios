@@ -19,21 +19,45 @@ SwiftUI + SwiftData で作ったシンプルな TODO アプリです。
 - iOS 17.0 以降
 - Xcode 16 以降
 
-## 構成
+## アーキテクチャ
+
+Clean Architecture に沿って 4 つの層に分けています。依存は常に内側（Domain）に向かい、Domain は他のどの層にも依存しません。
+
+```
+Presentation ──▶ Domain ◀── Data
+      ▲                       ▲
+      └──────── App ──────────┘   （App が全体を組み立てる）
+```
+
+| 層 | 役割 | 依存してよいもの |
+| --- | --- | --- |
+| **Domain** | エンティティ・ビジネスルール・ユースケース・リポジトリのプロトコル | Foundation のみ |
+| **Data** | `TodoRepository` の実装（SwiftData / インメモリ） | Domain, SwiftData |
+| **Presentation** | ViewModel（`@Observable`）と SwiftUI の View | Domain, SwiftUI |
+| **App** | エントリーポイントと依存関係の組み立て（Composition Root） | すべて |
+
+- View は ViewModel だけを見て、ViewModel はユースケース経由でデータを操作します。View や ViewModel は SwiftData を直接触りません。
+- 保存先を差し替えたい場合（iCloud・サーバー API など）は、`TodoRepository` に準拠した実装を Data 層に追加し、`AppContainer` で渡すだけで済みます。
 
 ```
 TodoApp/
-├── TodoApp.swift               アプリのエントリーポイント
-├── Models/
-│   ├── TodoItem.swift          SwiftData モデル
-│   ├── Priority.swift          優先度
-│   └── TodoListOptions.swift   絞り込み・並び替え・検索ロジック
-└── Views/
-    ├── TodoListView.swift      一覧画面
-    ├── TodoRowView.swift       一覧の行
-    ├── TodoEditorView.swift    追加・編集画面
-    └── PreviewSampleData.swift プレビュー用サンプルデータ
-TodoAppTests/                   Swift Testing によるユニットテスト
+├── App/
+│   ├── TodoApp.swift                      エントリーポイント
+│   └── AppContainer.swift                 依存関係の組み立て
+├── Domain/
+│   ├── Entities/                          Todo, Priority, TodoFilter, TodoSortOrder
+│   ├── Services/TodoListArranger.swift    絞り込み・検索・並び替えのルール
+│   ├── Repositories/TodoRepository.swift  永続化の抽象
+│   └── UseCases/                          取得・保存・完了切替・削除・完了済み一括削除
+├── Data/
+│   ├── SwiftData/                         TodoRecord（@Model）と SwiftDataTodoRepository（@ModelActor）
+│   └── InMemory/                          InMemoryTodoRepository（プレビュー・テスト用）
+└── Presentation/
+    ├── TodoList/                          一覧画面の View / ViewModel / 行
+    ├── TodoEditor/                        追加・編集画面の View / ViewModel
+    ├── Common/DisplayText.swift           ドメイン値の表示文言・色
+    └── Preview/PreviewSupport.swift       プレビュー用サンプルデータ
+TodoAppTests/                              層ごとのユニットテスト（Swift Testing）
 ```
 
 ## ビルド・実行
